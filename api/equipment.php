@@ -4,7 +4,7 @@ ini_set('display_errors', 0);
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, GET');
+header('Access-Control-Allow-Methods: POST, GET, DELETE');
 header('Access-Control-Allow-Headers: Content-Type');
 
 include_once 'C:/xampp/htdocs/GMS/functions/setup.php';
@@ -53,5 +53,20 @@ if ($method === 'GET') {
     $stmt = $db->query("SELECT * FROM equipment ORDER BY created_at DESC");
     $equipment = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode(['success' => true, 'data' => $equipment]);
+    exit;
+}
+if ($method === 'DELETE') {
+    $id = $_GET['id'] ?? '';
+    if (empty($id)) {
+        echo json_encode(['success' => false, 'message' => 'ID is required']);
+        exit;
+    }
+    $stmt = $db->prepare("DELETE FROM equipment WHERE id = :id");
+    $stmt->bindParam(':id', $id);
+    if ($stmt->execute()) {
+        echo json_encode(['success' => true, 'message' => 'Equipment deleted successfully']);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Failed to delete equipment']);
+    }
     exit;
 }

@@ -35,6 +35,10 @@ $stmt->bindParam(':id', $id);
 $stmt->execute();
 
 generate_logs('Payment', $id . '| Payment was made');
-header('Location: ../reciept.php?id=' . $paymentId);
+if (!isset($_SESSION['username'])) {
+    header('Location: ../member_dashboard.php?page=payment&type=success&message=Payment successful!');
+} else {
+    header('Location: ../reciept.php?id=' . $paymentId);
+}
 // header('Location: ../rentals.php?type=success&message=Payment was made successfully');
 ?>

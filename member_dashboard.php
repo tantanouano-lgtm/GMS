@@ -93,6 +93,7 @@ $todaySchedule = $schedule[$todayName];
         <a href="?page=trainers" class="nav-item <?php echo $page === 'trainers' ? 'active' : ''; ?>"><span class="nav-icon">🧑‍🏫</span> Available Trainers</a>
         <a href="?page=schedule" class="nav-item <?php echo $page === 'schedule' ? 'active' : ''; ?>"><span class="nav-icon">📅</span> Training Schedule</a>
         <a href="?page=body_schedule" class="nav-item <?php echo $page === 'body_schedule' ? 'active' : ''; ?>"><span class="nav-icon">💪</span> Body Schedule</a>
+        <a href="?page=payment" class="nav-item <?php echo $page === 'payment' ? 'active' : ''; ?>"><span class="nav-icon">💳</span> Pay Now</a>
         <a href="functions/logout.php" class="nav-item"><span class="nav-icon">🚪</span> Logout</a>
     </nav>
 </div>
@@ -391,6 +392,100 @@ $todaySchedule = $schedule[$todayName];
             </div>
             <?php endforeach; ?>
         </div>
+
+        <?php elseif ($page === 'payment'): ?>
+        <h5 class="fw-bold mb-4">💳 Make a Payment</h5>
+
+        <?php
+        $msg_type = $_GET['type'] ?? '';
+        $msg_text = $_GET['message'] ?? '';
+        if ($msg_type === 'success'): ?>
+        <div class="alert alert-success border-0 rounded-3"><?php echo htmlspecialchars($msg_text); ?></div>
+        <?php elseif ($msg_type === 'error'): ?>
+        <div class="alert alert-danger border-0 rounded-3"><?php echo htmlspecialchars($msg_text); ?></div>
+        <?php endif; ?>
+
+        <?php
+        $payStmt = $db->prepare("SELECT * FROM payments WHERE member = ? ORDER BY created_at DESC");
+        $payStmt->execute([$_SESSION['member_id']]);
+        $payHistory = $payStmt->fetchAll(PDO::FETCH_ASSOC);
+        ?>
+
+        <div class="row g-4">
+            <div class="col-md-5">
+                <div class="card border-0 shadow-sm" style="border-radius:14px">
+                    <div class="card-body p-4">
+                        <h6 class="fw-bold mb-3">New Payment</h6>
+                        <form action="functions/payment.php" method="POST">
+                            <input type="hidden" name="id" value="<?php echo $_SESSION['member_id']; ?>">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Plan Type</label>
+                                <select class="form-select" name="type" required onchange="updateAmount(this.value)">
+                                    <option value="">-- Select Plan --</option>
+                                    <option value="Regular">Regular - ₱300</option>
+                                    <option value="Premium">Premium - ₱500</option>
+                                    <option value="VIP">VIP - ₱800</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Amount to Pay</label>
+                                <input type="number" class="form-control" name="amount"
+                                       id="amountField" placeholder="Enter amount" required>
+                                <small class="text-muted" id="amountHint"></small>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100 fw-bold">
+                                💳 Pay Now
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-7">
+                <div class="card border-0 shadow-sm" style="border-radius:14px">
+                    <div class="card-body p-4">
+                        <h6 class="fw-bold mb-3">Payment History</h6>
+                        <?php if (count($payHistory) > 0): ?>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Amount</th>
+                                        <th>Total</th>
+                                        <th>Date</th>
+                                        <th>Receipt</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($payHistory as $pay): ?>
+                                    <tr>
+                                        <td><span class="badge bg-success"><?php echo htmlspecialchars($pay['type']); ?></span></td>
+                                        <td>₱<?php echo number_format($pay['amount'], 2); ?></td>
+                                        <td>₱<?php echo number_format($pay['total'], 2); ?></td>
+                                        <td><?php echo date('M d, Y', strtotime($pay['created_at'])); ?></td>
+                                        <td><a href="reciept.php?id=<?php echo $pay['id']; ?>" class="btn btn-sm btn-outline-success">🧾 View</a></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <?php else: ?>
+                        <p class="text-muted text-center mt-3">No payment history yet.</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        function updateAmount(plan) {
+            const prices = { 'Regular': 300, 'Premium': 500, 'VIP': 800 };
+            const hints  = { 'Regular': 'Minimum: ₱300', 'Premium': 'Minimum: ₱500', 'VIP': 'Minimum: ₱800' };
+            document.getElementById('amountField').value = prices[plan] || '';
+            document.getElementById('amountHint').textContent = hints[plan] || '';
+        }
+        </script>
 
         <?php endif; ?>
 
