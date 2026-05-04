@@ -19,7 +19,7 @@ if ($change < 0) {
     exit;
 }
 
-$sql = "INSERT INTO payments (member, type, amount, total) VALUES (:member, :type, :amount, :total)";
+$sql = "INSERT INTO payments (member, type, amount, total, is_notified) VALUES (:member, :type, :amount, :total, 0)";
 $stmt = $db->prepare($sql);
 $stmt->bindParam(':member', $id);
 $stmt->bindParam(':type', $type);

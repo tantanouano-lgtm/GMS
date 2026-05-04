@@ -1,6 +1,5 @@
 <?php
 include_once 'connection.php';
-
 $fullname = trim($_POST['fullname']);
 $phone    = trim($_POST['phone']);
 $sex      = $_POST['sex'];
@@ -37,6 +36,23 @@ $stmt = $db->prepare("INSERT INTO members (fullname, email, password, phone, sex
 $stmt->execute([$fullname, $email, $hashed, $phone, $sex, $birthdate, $address, $type, $start_date]);
 
 if ($stmt->rowCount() > 0) {
+    // Get the new member's ID
+    $newMemberId = $db->lastInsertId();
+
+    // Get the amount based on plan type
+    if ($type == 'Monthly') {
+        $total = 500;
+    } elseif ($type == 'Quarterly') {
+        $total = 1300;
+    } else {
+        $total = 4800; // Annual
+    }
+
+    // Insert payment record so admin can see it in desktop app
+    $paymentStmt = $db->prepare("INSERT INTO payments (member, type, amount, total, is_notified, created_at) 
+                                  VALUES (?, ?, ?, ?, 0, NOW())");
+    $paymentStmt->execute([$newMemberId, $type, $total, $total]);
+
     header('location: ../index.php?type=success&message=Registration successful! You can now login as a member.');
     exit();
 } else {
