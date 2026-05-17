@@ -23,6 +23,11 @@ $isExpired = $today > $expiry;
 $equipStmt = $db->query("SELECT * FROM equipment ORDER BY created_at DESC");
 $equipList = $equipStmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Get payment history
+$payStmt = $db->prepare("SELECT * FROM payments WHERE member = ? ORDER BY created_at DESC");
+$payStmt->execute([$_SESSION['member_id']]);
+$payments = $payStmt->fetchAll(PDO::FETCH_ASSOC);
+
 $page = $_GET['page'] ?? 'dashboard';
 
 $schedule = [
@@ -47,7 +52,7 @@ $todaySchedule = $schedule[$todayName];
     <link rel="stylesheet" href="assets/css/Nunito.css">
     <style>
         body { background: #f4f6f9; margin: 0; }
-        .sidebar { width: 240px; min-height: 100vh; background: #1a233a; position: fixed; top: 0; left: 0; display: flex; flex-direction: column; z-index: 100; }
+        .sidebar { width: 240px; min-height: 100vh; background: linear-gradient(180deg, #0f4c75 0%, #1b6ca8 50%, #198754 100%); position: fixed; top: 0; left: 0; display: flex; flex-direction: column; z-index: 100; }
         .sidebar-brand { padding: 20px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); }
         .sidebar-brand span { color: #fff; font-weight: 700; font-size: 18px; }
         .sidebar-nav { padding: 16px 0; flex: 1; }
@@ -56,7 +61,7 @@ $todaySchedule = $schedule[$todayName];
         .nav-item.active { background: rgba(25,135,84,0.25); color: #2ecc71; border-left: 3px solid #2ecc71; }
         .nav-item .nav-icon { font-size: 18px; width: 24px; text-align: center; }
         .main-content { margin-left: 240px; min-height: 100vh; display: flex; flex-direction: column; }
-        .topbar { background: #1a233a; padding: 14px 24px; display: flex; align-items: center; justify-content: flex-end; gap: 16px; }
+        .topbar { background: linear-gradient(90deg, #0f4c75, #198754); padding: 14px 24px; display: flex; align-items: center; justify-content: flex-end; gap: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
         .topbar span { color: #fff; font-size: 14px; }
         .content-area { padding: 28px; }
         .stat-card { border: none; border-radius: 14px; padding: 20px 24px; }
@@ -73,7 +78,13 @@ $todaySchedule = $schedule[$todayName];
         .exercise-tag { display: inline-block; background: #e8f5e9; color: #198754; border-radius: 20px; padding: 3px 12px; font-size: 12px; font-weight: 600; margin: 3px; }
         .trainer-card { border-radius: 14px; border: none; transition: transform 0.2s; }
         .trainer-card:hover { transform: translateY(-3px); }
-        .trainer-avatar { width: 64px; height: 64px; border-radius: 50%; background: #1a233a; color: #fff; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
+        .trainer-avatar { width: 64px; height: 64px; border-radius: 50%; background: #0f4c75; color: #fff; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
+        .plan-card { border: 2px solid #dee2e6; border-radius: 14px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .plan-card:hover { border-color: #198754; background: #f0faf4; transform: translateY(-3px); }
+        .plan-card.selected { border-color: #198754; background: #f0faf4; }
+        .plan-card .price { font-size: 28px; font-weight: 700; color: #198754; }
+        .plan-card .plan-name { font-size: 16px; font-weight: 700; color: #333; }
+        .plan-card .plan-desc { font-size: 12px; color: #888; margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -89,11 +100,11 @@ $todaySchedule = $schedule[$todayName];
     <nav class="sidebar-nav">
         <a href="?page=dashboard" class="nav-item <?php echo $page === 'dashboard' ? 'active' : ''; ?>"><span class="nav-icon">📊</span> Dashboard</a>
         <a href="?page=information" class="nav-item <?php echo $page === 'information' ? 'active' : ''; ?>"><span class="nav-icon">👤</span> My Information</a>
+        <a href="?page=payment" class="nav-item <?php echo $page === 'payment' ? 'active' : ''; ?>"><span class="nav-icon">💳</span> Payment</a>
         <a href="?page=equipment" class="nav-item <?php echo $page === 'equipment' ? 'active' : ''; ?>"><span class="nav-icon">🏋️</span> Available Equipment</a>
         <a href="?page=trainers" class="nav-item <?php echo $page === 'trainers' ? 'active' : ''; ?>"><span class="nav-icon">🧑‍🏫</span> Available Trainers</a>
         <a href="?page=schedule" class="nav-item <?php echo $page === 'schedule' ? 'active' : ''; ?>"><span class="nav-icon">📅</span> Training Schedule</a>
         <a href="?page=body_schedule" class="nav-item <?php echo $page === 'body_schedule' ? 'active' : ''; ?>"><span class="nav-icon">💪</span> Body Schedule</a>
-        <a href="?page=payment" class="nav-item <?php echo $page === 'payment' ? 'active' : ''; ?>"><span class="nav-icon">💳</span> Pay Now</a>
         <a href="functions/logout.php" class="nav-item"><span class="nav-icon">🚪</span> Logout</a>
     </nav>
 </div>
@@ -101,8 +112,9 @@ $todaySchedule = $schedule[$todayName];
 <!-- Main Content -->
 <div class="main-content">
     <div class="topbar">
-        <span>Welcome, <strong><?php echo htmlspecialchars($member['fullname']); ?></strong></span>
-        <a href="functions/logout.php" class="btn btn-outline-light btn-sm">Logout</a>
+        <span style="color:rgba(255,255,255,0.7); font-size:13px">📍 Member Portal</span>
+        <span style="color:#fff; font-size:14px">Welcome, <strong><?php echo htmlspecialchars($member['fullname']); ?></strong></span>
+        <a href="functions/logout.php" class="btn btn-danger btn-sm">Logout</a>
     </div>
 
     <div class="content-area">
@@ -139,7 +151,7 @@ $todaySchedule = $schedule[$todayName];
                 </div>
             </div>
         </div>
-        <div class="card border-0 shadow-sm mb-4" style="border-radius:14px; background: linear-gradient(135deg, #1a233a, #198754);">
+        <div class="card border-0 shadow-sm mb-4" style="border-radius:14px; background: linear-gradient(135deg, #0f4c75, #198754);">
             <div class="card-body p-4 text-white">
                 <div class="d-flex align-items-center gap-3">
                     <div style="font-size:48px"><?php echo $todaySchedule['icon']; ?></div>
@@ -156,9 +168,9 @@ $todaySchedule = $schedule[$todayName];
             </div>
         </div>
         <?php if ($isExpired): ?>
-        <div class="alert alert-danger border-0 rounded-3">Your membership has expired. Please contact the gym admin to renew.</div>
+        <div class="alert alert-danger border-0 rounded-3">Your membership has expired. Please contact the gym admin to renew. <a href="?page=payment" class="alert-link">Pay now →</a></div>
         <?php elseif ($remaining <= 7): ?>
-        <div class="alert alert-warning border-0 rounded-3">Your membership is expiring in <strong><?php echo $remaining; ?> days</strong>. Please contact the gym admin to renew.</div>
+        <div class="alert alert-warning border-0 rounded-3">Your membership is expiring in <strong><?php echo $remaining; ?> days</strong>. <a href="?page=payment" class="alert-link">Renew now →</a></div>
         <?php endif; ?>
 
         <?php elseif ($page === 'information'): ?>
@@ -182,6 +194,99 @@ $todaySchedule = $schedule[$todayName];
                 <div class="info-row"><span class="info-label">Status</span><span class="text-success fw-bold"><?php echo htmlspecialchars($member['status']); ?></span></div>
                 <div class="info-row"><span class="info-label">Member Since</span><span><?php echo date('F d, Y', strtotime($member['start_date'])); ?></span></div>
                 <div class="info-row"><span class="info-label">Expiry Date</span><span><?php echo $expiry->format('F d, Y'); ?></span></div>
+            </div>
+        </div>
+
+        <?php elseif ($page === 'payment'): ?>
+        <h5 class="fw-bold mb-4">💳 Payment</h5>
+
+        <?php
+        $msg = $_GET['message'] ?? '';
+        $msgType = $_GET['type'] ?? '';
+        if ($msg && $msgType === 'success'): ?>
+        <div class="alert alert-success border-0 rounded-3 mb-4">✅ <?php echo htmlspecialchars($msg); ?></div>
+        <?php elseif ($msg && $msgType === 'error'): ?>
+        <div class="alert alert-danger border-0 rounded-3 mb-4">❌ <?php echo htmlspecialchars($msg); ?></div>
+        <?php endif; ?>
+
+        <!-- Plan Selection -->
+        <div class="card border-0 shadow-sm mb-4" style="border-radius:14px">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-3">Choose a Plan</h6>
+                <form action="functions/payment.php" method="POST">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <div class="plan-card" onclick="selectPlan(this, 'Regular')">
+                                <div class="plan-name">Regular</div>
+                                <div class="price">₱300</div>
+                                <div class="plan-desc">30 days access</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="plan-card" onclick="selectPlan(this, 'Premium')">
+                                <div class="plan-name">Premium</div>
+                                <div class="price">₱500</div>
+                                <div class="plan-desc">60 days access</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="plan-card" onclick="selectPlan(this, 'VIP')">
+                                <div class="plan-name">VIP</div>
+                                <div class="price">₱800</div>
+                                <div class="plan-desc">90 days access</div>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="hidden" name="type" id="selected-plan" required>
+                    <button type="submit" class="btn btn-success w-100" id="pay-btn" disabled>
+                        💳 Pay Now
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Payment History -->
+        <h6 class="fw-bold mb-3">📋 Payment History</h6>
+        <div class="card border-0 shadow-sm" style="border-radius:14px">
+            <div class="card-body p-4">
+                <?php if (count($payments) > 0): ?>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Plan</th>
+                                <th>Amount</th>
+                                <th>Method</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($payments as $pay): ?>
+                            <tr>
+                                <td><?php echo $pay['id']; ?></td>
+                                <td><span class="badge bg-primary"><?php echo htmlspecialchars($pay['type']); ?></span></td>
+                                <td class="fw-bold">₱<?php echo number_format($pay['amount'], 2); ?></td>
+                                <td><?php echo htmlspecialchars($pay['payment_method'] ?? 'cash'); ?></td>
+                                <td>
+                                    <?php
+                                    $statusColor = $pay['status'] === 'paid' ? 'success' : ($pay['status'] === 'pending' ? 'warning' : 'danger');
+                                    ?>
+                                    <span class="badge bg-<?php echo $statusColor; ?>"><?php echo ucfirst($pay['status']); ?></span>
+                                </td>
+                                <td><?php echo date('M d, Y', strtotime($pay['created_at'])); ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php else: ?>
+                <div class="text-center text-muted py-4">
+                    <div style="font-size:40px">💳</div>
+                    <p class="mt-2 mb-0">No payment history yet.</p>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -356,7 +461,7 @@ $todaySchedule = $schedule[$todayName];
 
         <?php elseif ($page === 'body_schedule'): ?>
         <h5 class="fw-bold mb-4">💪 Weekly Body Schedule</h5>
-        <div class="card border-0 shadow-sm mb-4" style="border-radius:14px; background: linear-gradient(135deg, #1a233a, #198754);">
+        <div class="card border-0 shadow-sm mb-4" style="border-radius:14px; background: linear-gradient(135deg, #0f4c75, #198754);">
             <div class="card-body p-4 text-white">
                 <p class="mb-1 opacity-75 small fw-bold">TODAY — <?php echo strtoupper($todayName); ?></p>
                 <h3 class="fw-bold mb-2"><?php echo $todaySchedule['icon']; ?> <?php echo $todaySchedule['focus']; ?></h3>
@@ -393,100 +498,6 @@ $todaySchedule = $schedule[$todayName];
             <?php endforeach; ?>
         </div>
 
-        <?php elseif ($page === 'payment'): ?>
-        <h5 class="fw-bold mb-4">💳 Make a Payment</h5>
-
-        <?php
-        $msg_type = $_GET['type'] ?? '';
-        $msg_text = $_GET['message'] ?? '';
-        if ($msg_type === 'success'): ?>
-        <div class="alert alert-success border-0 rounded-3"><?php echo htmlspecialchars($msg_text); ?></div>
-        <?php elseif ($msg_type === 'error'): ?>
-        <div class="alert alert-danger border-0 rounded-3"><?php echo htmlspecialchars($msg_text); ?></div>
-        <?php endif; ?>
-
-        <?php
-        $payStmt = $db->prepare("SELECT * FROM payments WHERE member = ? ORDER BY created_at DESC");
-        $payStmt->execute([$_SESSION['member_id']]);
-        $payHistory = $payStmt->fetchAll(PDO::FETCH_ASSOC);
-        ?>
-
-        <div class="row g-4">
-            <div class="col-md-5">
-                <div class="card border-0 shadow-sm" style="border-radius:14px">
-                    <div class="card-body p-4">
-                        <h6 class="fw-bold mb-3">New Payment</h6>
-                        <form action="functions/payment.php" method="POST">
-                            <input type="hidden" name="id" value="<?php echo $_SESSION['member_id']; ?>">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Plan Type</label>
-                                <select class="form-select" name="type" required onchange="updateAmount(this.value)">
-                                    <option value="">-- Select Plan --</option>
-                                    <option value="Regular">Regular - ₱300</option>
-                                    <option value="Premium">Premium - ₱500</option>
-                                    <option value="VIP">VIP - ₱800</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Amount to Pay</label>
-                                <input type="number" class="form-control" name="amount"
-                                       id="amountField" placeholder="Enter amount" required>
-                                <small class="text-muted" id="amountHint"></small>
-                            </div>
-                            <button type="submit" class="btn btn-success w-100 fw-bold">
-                                💳 Pay Now
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-7">
-                <div class="card border-0 shadow-sm" style="border-radius:14px">
-                    <div class="card-body p-4">
-                        <h6 class="fw-bold mb-3">Payment History</h6>
-                        <?php if (count($payHistory) > 0): ?>
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Type</th>
-                                        <th>Amount</th>
-                                        <th>Total</th>
-                                        <th>Date</th>
-                                        <th>Receipt</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($payHistory as $pay): ?>
-                                    <tr>
-                                        <td><span class="badge bg-success"><?php echo htmlspecialchars($pay['type']); ?></span></td>
-                                        <td>₱<?php echo number_format($pay['amount'], 2); ?></td>
-                                        <td>₱<?php echo number_format($pay['total'], 2); ?></td>
-                                        <td><?php echo date('M d, Y', strtotime($pay['created_at'])); ?></td>
-                                        <td><a href="reciept.php?id=<?php echo $pay['id']; ?>" class="btn btn-sm btn-outline-success">🧾 View</a></td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                        <?php else: ?>
-                        <p class="text-muted text-center mt-3">No payment history yet.</p>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <script>
-        function updateAmount(plan) {
-            const prices = { 'Regular': 300, 'Premium': 500, 'VIP': 800 };
-            const hints  = { 'Regular': 'Minimum: ₱300', 'Premium': 'Minimum: ₱500', 'VIP': 'Minimum: ₱800' };
-            document.getElementById('amountField').value = prices[plan] || '';
-            document.getElementById('amountHint').textContent = hints[plan] || '';
-        }
-        </script>
-
         <?php endif; ?>
 
     </div>
@@ -495,5 +506,13 @@ $todaySchedule = $schedule[$todayName];
 <script src="assets/js/jquery.min.js"></script>
 <script src="assets/bootstrap/js/bootstrap.min.js"></script>
 <script src="assets/js/sweetalert.min.js"></script>
+<script>
+function selectPlan(el, plan) {
+    document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('selected-plan').value = plan;
+    document.getElementById('pay-btn').disabled = false;
+}
+</script>
 </body>
 </html>

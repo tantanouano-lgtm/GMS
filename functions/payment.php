@@ -1,44 +1,47 @@
 <?php
 include_once 'connection.php';
+session_start();
 
-$id = $_POST['id'];
-$type = $_POST['type'];
-if ($type == 'Regular'){
-    $total = 300;
-} elseif ($type == 'Premium'){
-    $total = 500;
-} else {
-    $total = 800;
-}
-
-$amount = $_POST['amount'];
-$change = $amount - $total;
-
-if ($change < 0) {
-    header('Location: ../status.php?type=error&message=Amount is not enough');
+if (!isset($_SESSION['member_id'])) {
+    header('Location: ../index.php');
     exit;
 }
 
-$sql = "INSERT INTO payments (member, type, amount, total, is_notified) VALUES (:member, :type, :amount, :total, 0)";
-$stmt = $db->prepare($sql);
-$stmt->bindParam(':member', $id);
-$stmt->bindParam(':type', $type);
-$stmt->bindParam(':amount', $amount);
-$stmt->bindParam(':total', $total);
-$stmt->execute();
+$id   = $_SESSION['member_id'];
+$type = $_POST['type'] ?? '';
 
-$paymentId = $db->lastInsertId();
+$plans = [
+    'Regular' => 300,
+    'Premium' => 500,
+    'VIP'     => 800,
+];
 
-$sql = "UPDATE members SET start_date = CURDATE() WHERE id = :id";
-$stmt = $db->prepare($sql);
-$stmt->bindParam(':id', $id);
-$stmt->execute();
-
-generate_logs('Payment', $id . '| Payment was made');
-if (!isset($_SESSION['username'])) {
-    header('Location: ../member_dashboard.php?page=payment&type=success&message=Payment successful!');
-} else {
-    header('Location: ../reciept.php?id=' . $paymentId);
+if (!array_key_exists($type, $plans)) {
+    header('Location: ../member_dashboard.php?page=payment&type=error&message=Invalid plan selected');
+    exit;
 }
-// header('Location: ../rentals.php?type=success&message=Payment was made successfully');
+
+// Submit payment via API
+$apiUrl = 'http://localhost/GMS/api/payments.php';
+$data   = [
+    'member' => $id,
+    'type'   => $type,
+];
+
+$ch = curl_init($apiUrl);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+$response = json_decode(curl_exec($ch), true);
+curl_close($ch);
+
+if (!isset($response['success'])) {
+    header('Location: ../member_dashboard.php?page=payment&type=error&message=Payment failed, please try again');
+    exit;
+}
+
+generate_logs('Payment', $id . '| Payment was made for plan: ' . $type);
+header('Location: ../member_dashboard.php?page=payment&type=success&message=Payment submitted successfully!');
+exit;
 ?>

@@ -1,42 +1,25 @@
 <?php
-include_once 'functions/connection.php';
+$apiUrl   = 'http://localhost/GMS/api/dashboard.php';
+$response = file_get_contents($apiUrl);
+$data     = json_decode($response, true);
 
 function calculateMonthlyEarnings() {
-    global $db;
-    $sql = 'SELECT SUM(total) AS monthlyEarnings FROM payments WHERE MONTH(created_at) = MONTH(CURRENT_DATE())';
-    $stmt = $db->prepare($sql);
-    $stmt->execute();
-    $result = $stmt->fetch();
-    $monthlyEarnings = $result['monthlyEarnings'];
-    return $monthlyEarnings;
+    global $data;
+    return $data['monthlyEarnings'] ?? 0;
 }
 
 function calculateYearlyEarnings() {
-    global $db;
-    $sql = 'SELECT SUM(total) AS yearlyEarnings FROM payments WHERE YEAR(created_at) = YEAR(CURRENT_DATE())';
-    $stmt = $db->prepare($sql);
-    $stmt->execute();
-    $result = $stmt->fetch();
-    $yearlyEarnings = $result['yearlyEarnings'];
-    return $yearlyEarnings;
+    global $data;
+    return $data['yearlyEarnings'] ?? 0;
 }
 
 function countTotalActiveMembers() {
-    global $db;
-    $sql = 'SELECT COUNT(*) AS totalActiveMembers FROM `members` WHERE DATE_ADD(start_date, INTERVAL 1 MONTH) > CURDATE()';
-    $stmt = $db->prepare($sql);
-    $stmt->execute();
-    $result = $stmt->fetch();
-    $totalActiveMembers = $result['totalActiveMembers'];
-    return $totalActiveMembers;
+    global $data;
+    return $data['totalActiveMembers'] ?? 0;
 }
 
 function countTotalMembers() {
-    global $db;
-    $sql = 'SELECT COUNT(*) AS totalMembers FROM members';
-    $stmt = $db->prepare($sql);
-    $stmt->execute();
-    $result = $stmt->fetch();
-    $totalMembers = $result['totalMembers'];
-    return $totalMembers;
+    global $data;
+    return $data['totalMembers'] ?? 0;
 }
+?>

@@ -1,32 +1,21 @@
 <?php
-include_once 'functions/connection.php';
-
-$sql = 'SELECT * FROM logs';
-$stmt = $db->prepare($sql);
-$stmt->execute();
-$results = $stmt->fetchAll();
-
+$apiUrl   = 'http://localhost/GMS/api/logs.php';
+$response = file_get_contents($apiUrl);
+$results  = json_decode($response, true);
 
 foreach ($results as $row) {
- 
-    $sql = 'SELECT username FROM users WHERE id = :id';
-    $stmt = $db->prepare($sql);
-    $stmt->bindParam(':id', $row['user_id']);
-    $stmt->execute();
-    $user = $stmt->fetch();
-    ?>
-        <tr>
-            <td><?php echo $row['id']; ?></td>
-            <td><img class="rounded-circle me-2" width="30" height="30" src="https://bootdey.com/img/Content/avatar/avatar7.png"><?php echo $user['username'] ?></td>
-            <td><?php echo $row['type'] ?></td>
-            <td><?php echo $row['logs'] ?></td>
-            <td><?php echo $row['created_at'] ?></td>
-
-        <?php
-        
-        ?>
-
+?>
+    <tr>
+        <td><?=$row['id']?></td>
+        <td>
+            <img class="rounded-circle me-2" width="30" height="30" 
+            src="https://bootdey.com/img/Content/avatar/avatar7.png">
+            <?=$row['username'] ?? 'Unknown'?>
+        </td>
+        <td><?=$row['type']?></td>
+        <td><?=$row['logs']?></td>
+        <td><?=$row['created_at']?></td>
     </tr>
-        
 <?php
 }
+?>

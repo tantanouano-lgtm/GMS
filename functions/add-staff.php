@@ -2,30 +2,44 @@
 include_once 'connection.php';
 
 $fullname = $_POST['fullname'];
-$phone = $_POST['phone'];
-$address = $_POST['address'];
+$phone    = $_POST['phone'];
+$address  = $_POST['address'];
 $username = $_POST['username'];
 $password = $_POST['password'];
 
-$sql = "SELECT * FROM `users` WHERE username = :username OR phone = :phone";
-$stmt = $db->prepare($sql);
-$stmt->bindParam(':username', $username);
-$stmt->bindParam(':phone', $phone);
-$stmt->execute();
-$count = $stmt->rowCount();
+// Check if staff already exists via API
+$apiUrl   = 'http://localhost/GMS/api/staff.php';
+$existing = json_decode(file_get_contents($apiUrl), true);
 
-if ($count > 0) {
-    header('Location: ../staff.php?type=error&message=Staff already exists');
+foreach ($existing as $staff) {
+    if ($staff['username'] == $username || $staff['phone'] == $phone) {
+        header('Location: ../staff.php?type=error&message=Staff already exists');
+        exit;
+    }
+}
+
+// Add staff via API (POST)
+$data = [
+    'fullname' => $fullname,
+    'phone'    => $phone,
+    'address'  => $address,
+    'username' => $username,
+    'password' => $password,
+];
+
+$ch = curl_init($apiUrl);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+$response = json_decode(curl_exec($ch), true);
+curl_close($ch);
+
+if (!isset($response['success'])) {
+    header('Location: ../staff.php?type=error&message=Failed to add staff');
     exit;
 }
 
-$sql = "INSERT INTO `users` (`fullname`, `phone`, `address`, `username`, `password`, `level`) VALUES (:fullname, :phone, :address, :username, :password, 1)";
-$stmt = $db->prepare($sql);
-$stmt->bindParam(':fullname', $fullname);
-$stmt->bindParam(':phone', $phone);
-$stmt->bindParam(':address', $address);
-$stmt->bindParam(':username', $username);
-$stmt->bindParam(':password', password_hash($password, PASSWORD_DEFAULT));
-$stmt->execute();
-
+generate_logs('Add Staff', 'New staff was added: ' . $username);
 header('Location: ../staff.php?type=success&message=Staff details were added successfully');
+?>
